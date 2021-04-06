@@ -23,8 +23,8 @@ impl Gitter {
         self.x
     }
 
-    pub fn get_row(&self, col: usize) -> &[f32] {
-        &self.gitter[col..col + self.x]
+    pub fn get_row(&self, row: usize) -> &[f32] {
+        &self.gitter[(row*self.x)..(row*self.x + self.x)]
     }
 
     //non-cont slice can only be a copy, leave it out for now
