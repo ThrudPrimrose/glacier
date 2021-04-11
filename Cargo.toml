@@ -11,3 +11,5 @@ name = "integration"
 path = "tests/test.rs"
 
 [dependencies]
+rayon = "1.5"
+float-ord = "0.3.1"

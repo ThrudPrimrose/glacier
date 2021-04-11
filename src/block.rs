@@ -49,6 +49,4 @@ impl Block {
             boundaries: [BoundaryType::Wall; 4],
         }
     }
-
-    
 }
