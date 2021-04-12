@@ -138,6 +138,7 @@ impl Block {
             .map(|updates| updates.max_wavespeed)
             .reduce(id, op);
 
+        //get max wavespeed of both x and y directions
         let max_wavespeed = f32::max(max_wavespeed_x, max_wavespeed_y);
 
         //calculate max time step
@@ -198,6 +199,21 @@ impl Block {
         // update h from updates y
         // ranges for y is different (1..(self.ny + 2)), (1..(self.nx + 1))
         // Same concept as the x direction but all the lines becomes blocks now
+        self.h.par_iter_mut().enumerate().for_each(|(i, el)| {
+            if i > nxp2 && i < len - 1 {
+                let offset = i % nxp2;
+                //for all the lines before substract 2, for the current line substract 1
+                let line = i / nxp2;
+                let off = (i - (2 * (line - 1))) - 1;
+
+                if offset != 0 && offset != nxp1 {
+                    if line == 1 {
+                    } else if line == nyp1 {
+                    } else {
+                    }
+                }
+            }
+        });
 
         //update hu from updates x
 
