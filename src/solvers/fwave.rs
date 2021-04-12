@@ -1,12 +1,20 @@
-use crate::solvers::{Solver, SolverData, Updates};
+use crate::solvers::{Solver, SolverData, Update};
 
-struct FWave {
+pub struct FWave {
     data: SolverData,
 }
 
 impl FWave {
-    pub fn new(i_dry_tolerance: f32, i_gravity: f32, i_zero_tolerance: f32) -> SolverData {
-        SolverData::new(i_dry_tolerance, i_gravity, i_zero_tolerance)
+    pub fn default() -> FWave {
+        FWave {
+            data: SolverData::default(),
+        }
+    }
+
+    pub fn new(i_dry_tolerance: f32, i_gravity: f32, i_zero_tolerance: f32) -> FWave {
+        FWave {
+            data: SolverData::new(i_dry_tolerance, i_gravity, i_zero_tolerance),
+        }
     }
 
     //unused variables were present in the c++ code is it needed for vectorization?
@@ -70,82 +78,102 @@ impl FWave {
 }
 
 impl Solver for FWave {
-    fn compute_net_updates(&mut self) -> Updates {
-        if self.data.h_left >= self.data.dry_tolerance {
-            if self.data.h_right < self.data.dry_tolerance {
-                self.data.h_left = self.data.h_right;
-                self.data.hu_left = -self.data.hu_right;
-                self.data.b_left = self.data.b_right;
+    /*
+    fn set_values(
+        &mut self,
+        h_left: f32,
+        h_right: f32,
+        hu_left: f32,
+        hu_right: f32,
+        b_left: f32,
+        b_right: f32,
+    ) -> () {
+        self.data.h_left = h_left;
+        self.data.h_right = h_right;
+        self.data.hu_left = hu_left;
+        self.data.hu_right = hu_right;
+        self.data.b_left = b_left;
+        self.data.b_right = b_right;
+    }
+    */
+
+    fn compute_net_updates(
+        &self,
+        mut h_left: f32,
+        mut h_right: f32,
+        mut hu_left: f32,
+        mut hu_right: f32,
+        mut b_left: f32,
+        mut b_right: f32,
+    ) -> Update {
+        if h_left >= self.data.dry_tolerance {
+            if h_right < self.data.dry_tolerance {
+                h_left = h_right;
+                hu_left = -hu_right;
+                b_left = b_right;
             }
-        } else if self.data.h_right > self.data.dry_tolerance {
-            self.data.h_right = self.data.h_left;
-            self.data.hu_right = -self.data.hu_left;
-            self.data.b_right = self.data.b_left;
+        } else if h_right > self.data.dry_tolerance {
+            h_right = h_left;
+            hu_right = -hu_left;
+            b_right = b_left;
         } else {
-            self.data.h_left = self.data.dry_tolerance;
-            self.data.hu_left = 0.0;
-            self.data.b_left = 0.0;
-            self.data.h_right = self.data.dry_tolerance;
-            self.data.hu_right = 0.0;
-            self.data.b_right = 0.0;
+            h_left = self.data.dry_tolerance;
+            hu_left = 0.0;
+            b_left = 0.0;
+            h_right = self.data.dry_tolerance;
+            hu_right = 0.0;
+            b_right = 0.0;
         }
 
-        let u_left = self.data.hu_left / self.data.h_left;
-        let u_right = self.data.hu_right / self.data.h_right;
+        let u_left = hu_left / h_left;
+        let u_right = hu_right / h_right;
 
         let wavespeeds: (f32, f32) = self.fwave_compute_wave_speeds(
-            self.data.h_left,
-            self.data.h_right,
-            self.data.hu_left,
-            self.data.hu_right,
-            u_left,
-            u_right,
-            self.data.b_left,
-            self.data.b_right,
+            h_left, h_right, hu_left, hu_right, u_left, u_right, b_left, b_right,
         );
 
         let fwaves: (f32, f32) = self.fwave_compute_wave_decompositions(
-            self.data.h_left,
-            self.data.h_right,
-            self.data.hu_left,
-            self.data.hu_right,
+            h_left,
+            h_right,
+            hu_left,
+            hu_right,
             u_left,
             u_right,
-            self.data.b_left,
-            self.data.b_right,
+            b_left,
+            b_right,
             wavespeeds.0,
             wavespeeds.1,
         );
 
-        let mut updates = Updates::new();
+        let mut update = Update::new();
 
         if wavespeeds.0 < -self.data.zero_tolerance {
-            updates.h_update_left += fwaves.0;
-            updates.hu_update_left += fwaves.0 * wavespeeds.0;
+            update.h_update_left += fwaves.0;
+            update.hu_update_left += fwaves.0 * wavespeeds.0;
         } else if wavespeeds.0 > self.data.zero_tolerance {
-            updates.h_update_right += fwaves.0;
-            updates.hu_update_right += fwaves.0 * wavespeeds.0;
+            update.h_update_right += fwaves.0;
+            update.hu_update_right += fwaves.0 * wavespeeds.0;
         } else {
-            updates.h_update_left += 0.5 * fwaves.0;
-            updates.hu_update_left += 0.5 * fwaves.0 * wavespeeds.0;
-            updates.h_update_right += 0.5 * fwaves.0;
-            updates.hu_update_right += 0.5 * fwaves.0 * wavespeeds.0;
+            update.h_update_left += 0.5 * fwaves.0;
+            update.hu_update_left += 0.5 * fwaves.0 * wavespeeds.0;
+            update.h_update_right += 0.5 * fwaves.0;
+            update.hu_update_right += 0.5 * fwaves.0 * wavespeeds.0;
         }
 
         if wavespeeds.1 > self.data.zero_tolerance {
-            updates.h_update_right += fwaves.1;
-            updates.hu_update_right += fwaves.1 * wavespeeds.1;
+            update.h_update_right += fwaves.1;
+            update.hu_update_right += fwaves.1 * wavespeeds.1;
         } else if wavespeeds.1 < -self.data.zero_tolerance {
-            updates.h_update_left += fwaves.1;
-            updates.hu_update_left += fwaves.1 * wavespeeds.1;
+            update.h_update_left += fwaves.1;
+            update.hu_update_left += fwaves.1 * wavespeeds.1;
         } else {
-            updates.h_update_left += 0.5 * fwaves.1;
-            updates.hu_update_left += 0.5 * fwaves.1 * wavespeeds.1;
-            updates.h_update_right += 0.5 * fwaves.1;
-            updates.hu_update_right += 0.5 * fwaves.1 * wavespeeds.1;
+            update.h_update_left += 0.5 * fwaves.1;
+            update.hu_update_left += 0.5 * fwaves.1 * wavespeeds.1;
+            update.h_update_right += 0.5 * fwaves.1;
+            update.hu_update_right += 0.5 * fwaves.1 * wavespeeds.1;
         }
 
-        updates.max_wavespeed = f32::max(f32::abs(wavespeeds.0), f32::abs(wavespeeds.1));
-        updates
+        update.max_wavespeed = f32::max(f32::abs(wavespeeds.0), f32::abs(wavespeeds.1));
+        update
     }
 }
