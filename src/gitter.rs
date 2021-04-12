@@ -6,8 +6,9 @@ use std::{
 use rayon::{iter::IntoParallelRefMutIterator, slice::IterMut};
 
 pub struct Gitter {
-    x: usize,         //size in x
-    y: usize,         //size in y
+    x: usize, //size in x
+    y: usize, //size in y
+    len: usize,
     gitter: Vec<f32>, //use vector because array always require compile time constants
 }
 
@@ -16,6 +17,7 @@ impl Gitter {
         Gitter {
             x: x,
             y: y,
+            len: x * y,
             gitter: vec![0.0; x * y],
         }
     }
@@ -38,6 +40,10 @@ impl Gitter {
 
     pub fn par_iter_mut(&mut self) -> IterMut<f32> {
         self.gitter.par_iter_mut()
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
     }
 
     //non-cont slice can only be a copy, leave it out for now

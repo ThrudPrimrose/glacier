@@ -81,7 +81,7 @@ impl Block {
         let dy_inv: f32 = 1.0 / self.dy;
 
         //calculate updates in x direction
-        let mut updates_x: Vec<Update> = (1..(self.ny + 1))
+        let updates_x: Vec<Update> = (1..(self.ny + 1))
             .into_par_iter()
             .flat_map(|i| {
                 (1..(self.nx + 2))
@@ -101,7 +101,7 @@ impl Block {
             .collect();
 
         //calculats updates in y direction
-        let mut updates_y: Vec<Update> = (1..(self.ny + 2))
+        let updates_y: Vec<Update> = (1..(self.ny + 2))
             .into_par_iter()
             .flat_map(|i| {
                 (1..(self.nx + 1))
@@ -141,6 +141,7 @@ impl Block {
         let max_wavespeed = f32::max(max_wavespeed_x, max_wavespeed_y);
 
         //calculate max time step
+        //updates x <- (1..(self.ny + 2)) ,  (1..(self.nx + 1))
         if max_wavespeed > 0.000001 {
             self.max_timestep = f32::min(self.dx / max_wavespeed, self.dy / max_wavespeed);
             self.max_timestep *= 0.4f32;
@@ -148,16 +149,71 @@ impl Block {
             self.max_timestep = f32::MAX;
         }
 
-        //update h from updates x
-        //self.h.par_iter_mut().enumerate().for_each(|(i, h)| {});
+        //can't access self within the loop so save the elements as constants before and access later
+        let len = self.h.len();
+        let nxp1 = self.nx + 1;
+        let nxp2 = self.nx + 2;
+        let nyp1 = self.ny + 1;
+        let nyp2 = self.ny + 2;
+        let dt = self.max_timestep;
+        let lastlinebegin = len - nxp2;
 
-        //update h form updates y
+        //update h from updates x
+        //ranges for updates_x :(1..(self.ny + 1)),  (1..(self.nx + 2))
+        /*
+            -----------
+            | |     | |
+            | |     | |
+            | |     | |
+            -----------
+            Ghost cells only receive updates from their right neighbor if first cell, and from their left update if they are the last cell of the line
+            the updates are calculated only for between 1..nx+2 meaning that every line has nx+1 many Updates, need to map 2d coordinates of the gitter
+            to the right offset in the flat updates array. This means from the 1d index that descrives 2d coordinates of the gitter
+            one needs to remove the first ghost cell and the first and last line and update accordingly.
+
+        */
+
+        self.h.par_iter_mut().enumerate().for_each(|(i, el)| {
+            //do not update ghost cells with wrong indices, first and last cell of everyrow
+            //not in the first line (ghost cell), not in the last inge (ghost cells), not the first cell in the row
+            if i > nxp2 && i < lastlinebegin {
+                let offset = i % nxp2;
+                let off = (i - (i / nxp2)) - nxp1;
+
+                //first cell
+                if offset == 0 {
+                    *el = dt * dx_inv * updates_x[off].h_update_left;
+                } else if offset == nxp2 - 1 {
+                    //last cell
+                    *el = dt * dx_inv * updates_x[off - 1].h_update_right;
+                } else {
+                    //not a ghost cell
+                    *el -= dt
+                        * (dx_inv * updates_x[off - 1].h_update_right
+                            + dx_inv * updates_x[off].h_update_left);
+                }
+            }
+        });
+
+        // update h from updates y
+        // ranges for y is different (1..(self.ny + 2)), (1..(self.nx + 1))
+        // Same concept as the x direction but all the lines becomes blocks now
 
         //update hu from updates x
 
         //update hv form updates y
 
         //set hu = 0 if h = 0
+        //TODO: bounds
+        /*
+        let href = &self.h;
+        self.hu.par_iter_mut().enumerate().for_each(|(i, e)| {
+            let h = href[i];
+            if  f32::le(&h,&0.1f32) {
+                *e = 0.0f32;
+            }
+        });
+        */
 
         //set hv = 0 if h = 0
 
