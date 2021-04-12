@@ -1,6 +1,5 @@
 use rayon::iter::{
-    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator,
-    IntoParallelRefMutIterator, ParallelIterator,
+    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
 };
 
 use super::gitter;
@@ -199,17 +198,23 @@ impl Block {
         // update h from updates y
         // ranges for y is different (1..(self.ny + 2)), (1..(self.nx + 1))
         // Same concept as the x direction but all the lines becomes blocks now
+        // left -> down, right -> up in y direction
         self.h.par_iter_mut().enumerate().for_each(|(i, el)| {
             if i > nxp2 && i < len - 1 {
                 let offset = i % nxp2;
                 //for all the lines before substract 2, for the current line substract 1
                 let line = i / nxp2;
-                let off = (i - (2 * (line - 1))) - 1;
+                let off = (i - (2 * (line - 1))) - 1 - nxp2;
 
                 if offset != 0 && offset != nxp1 {
                     if line == 1 {
+                        *el = dt * dx_inv * updates_y[off].h_update_left;
                     } else if line == nyp1 {
+                        *el = dt * dx_inv * updates_y[off - 1].h_update_right;
                     } else {
+                        *el -= dt
+                            * (dx_inv * updates_y[off - 1].h_update_right
+                                + dx_inv * updates_y[off].h_update_left);
                     }
                 }
             }
